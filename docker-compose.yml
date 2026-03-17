@@ -27,6 +27,9 @@ services:
       PAPERCLIP_DEPLOYMENT_EXPOSURE: "private"
       PAPERCLIP_PUBLIC_URL: "${PAPERCLIP_PUBLIC_URL:-http://localhost:3100}"
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}"
+      # BuckGuru embed auth (Operations iframe integration)
+      PAPERCLIP_EMBED_BUCKGURU_SECRET: "${PAPERCLIP_EMBED_BUCKGURU_SECRET:-}"
+      PAPERCLIP_EMBED_PARENT_ORIGIN: "${PAPERCLIP_EMBED_PARENT_ORIGIN:-}"
     volumes:
       - paperclip-data:/paperclip
     depends_on:
