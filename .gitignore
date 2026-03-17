@@ -48,3 +48,6 @@ tests/e2e/test-results/
 tests/e2e/playwright-report/
 .superset/
 .worktrees/
+
+# OpenClaw seed data (may contain secrets)
+docker/openclaw/seed/
