@@ -5,6 +5,8 @@ export type HealthStatus = {
   authReady?: boolean;
   bootstrapStatus?: "ready" | "bootstrap_pending";
   bootstrapInviteActive?: boolean;
+  embedAuthEnabled?: boolean;
+  embedParentOrigin?: string | null;
   features?: {
     companyDeletionEnabled?: boolean;
   };

@@ -11,6 +11,8 @@ export function healthRoutes(
     deploymentExposure: DeploymentExposure;
     authReady: boolean;
     companyDeletionEnabled: boolean;
+    embedAuthEnabled?: boolean;
+    embedParentOrigin?: string;
   } = {
     deploymentMode: "local_trusted",
     deploymentExposure: "private",
@@ -61,6 +63,8 @@ export function healthRoutes(
       authReady: opts.authReady,
       bootstrapStatus,
       bootstrapInviteActive,
+      embedAuthEnabled: opts.embedAuthEnabled ?? false,
+      embedParentOrigin: opts.embedParentOrigin ?? null,
       features: {
         companyDeletionEnabled: opts.companyDeletionEnabled,
       },

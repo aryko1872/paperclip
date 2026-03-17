@@ -2,7 +2,9 @@ import express, { Router, type Request as ExpressRequest } from "express";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { eq } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
+import { authUsers } from "@paperclipai/db";
 import type { DeploymentExposure, DeploymentMode } from "@paperclipai/shared";
 import type { StorageService } from "./storage/types.js";
 import { httpLogger, errorHandler } from "./middleware/index.js";
@@ -26,6 +28,7 @@ import { assetRoutes } from "./routes/assets.js";
 import { accessRoutes } from "./routes/access.js";
 import { pluginRoutes } from "./routes/plugins.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
+import { embedAuthRoutes } from "./routes/embed-auth.js";
 import { applyUiBranding } from "./ui-branding.js";
 import { logger } from "./middleware/logger.js";
 import { DEFAULT_LOCAL_PLUGIN_DIR, pluginLoader } from "./services/plugin-loader.js";
@@ -92,11 +95,29 @@ export async function createApp(
       resolveSession: opts.resolveSession,
     }),
   );
-  app.get("/api/auth/get-session", (req, res) => {
+  app.get("/api/auth/get-session", async (req, res) => {
     if (req.actor.type !== "board" || !req.actor.userId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+
+    let email: string | null = null;
+    let name: string | null = null;
+
+    if (req.actor.source === "local_implicit") {
+      name = "Local Board";
+    } else {
+      const userRow = await db
+        .select({ email: authUsers.email, name: authUsers.name })
+        .from(authUsers)
+        .where(eq(authUsers.id, req.actor.userId))
+        .then((rows) => rows[0] ?? null);
+      if (userRow) {
+        email = userRow.email;
+        name = userRow.name;
+      }
+    }
+
     res.json({
       session: {
         id: `paperclip:${req.actor.source}:${req.actor.userId}`,
@@ -104,11 +125,12 @@ export async function createApp(
       },
       user: {
         id: req.actor.userId,
-        email: null,
-        name: req.actor.source === "local_implicit" ? "Local Board" : null,
+        email,
+        name,
       },
     });
   });
+  app.use("/api/auth/embed", embedAuthRoutes(db));
   if (opts.betterAuthHandler) {
     app.all("/api/auth/*authPath", opts.betterAuthHandler);
   }
@@ -124,6 +146,8 @@ export async function createApp(
       deploymentExposure: opts.deploymentExposure,
       authReady: opts.authReady,
       companyDeletionEnabled: opts.companyDeletionEnabled,
+      embedAuthEnabled: Boolean(process.env.PAPERCLIP_EMBED_BUCKGURU_SECRET),
+      embedParentOrigin: process.env.PAPERCLIP_EMBED_PARENT_ORIGIN ?? undefined,
     }),
   );
   api.use("/companies", companyRoutes(db));
