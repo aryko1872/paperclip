@@ -64,6 +64,10 @@ COPY <<'ENTRYPOINT' /entrypoint.sh
 #!/bin/sh
 chown -R node:node /paperclip
 
+# Link node user's .claude config to the persistent volume so credentials survive deploys
+rm -rf /home/node/.claude
+ln -sf /paperclip/.claude /home/node/.claude
+
 exec gosu node node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js
 ENTRYPOINT
 RUN chmod +x /entrypoint.sh
