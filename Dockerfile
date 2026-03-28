@@ -21,11 +21,7 @@ COPY packages/adapters/openclaw-gateway/package.json packages/adapters/openclaw-
 COPY packages/adapters/opencode-local/package.json packages/adapters/opencode-local/
 COPY packages/adapters/pi-local/package.json packages/adapters/pi-local/
 COPY packages/plugins/sdk/package.json packages/plugins/sdk/
-COPY packages/plugins/create-paperclip-plugin/package.json packages/plugins/create-paperclip-plugin/
-COPY packages/plugins/examples/plugin-hello-world-example/package.json packages/plugins/examples/plugin-hello-world-example/
-COPY packages/plugins/examples/plugin-file-browser-example/package.json packages/plugins/examples/plugin-file-browser-example/
-COPY packages/plugins/examples/plugin-kitchen-sink-example/package.json packages/plugins/examples/plugin-kitchen-sink-example/
-COPY packages/plugins/examples/plugin-authoring-smoke-example/package.json packages/plugins/examples/plugin-authoring-smoke-example/
+COPY patches/ patches/
 
 RUN pnpm install --frozen-lockfile
 
@@ -33,19 +29,17 @@ FROM base AS build
 WORKDIR /app
 COPY --from=deps /app /app
 COPY . .
-RUN pnpm -r build
+RUN pnpm --filter @paperclipai/ui build
+RUN pnpm --filter @paperclipai/plugin-sdk build
+RUN pnpm --filter @paperclipai/server build
 RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
 
 FROM base AS production
 WORKDIR /app
-COPY --from=build /app /app
+COPY --chown=node:node --from=build /app /app
 RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai \
   && mkdir -p /paperclip \
-  && apt-get update && apt-get install -y --no-install-recommends gosu \
-  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-  && apt-get update && apt-get install -y --no-install-recommends gh \
-  && rm -rf /var/lib/apt/lists/*
+  && chown node:node /paperclip
 
 ENV NODE_ENV=production \
   HOME=/paperclip \
@@ -58,18 +52,8 @@ ENV NODE_ENV=production \
   PAPERCLIP_DEPLOYMENT_MODE=authenticated \
   PAPERCLIP_DEPLOYMENT_EXPOSURE=private
 
+VOLUME ["/paperclip"]
 EXPOSE 3100
 
-COPY <<'ENTRYPOINT' /entrypoint.sh
-#!/bin/sh
-chown -R node:node /paperclip
-
-# Link node user's .claude config to the persistent volume so credentials survive deploys
-rm -rf /home/node/.claude
-ln -sf /paperclip/.claude /home/node/.claude
-
-exec gosu node node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js
-ENTRYPOINT
-RUN chmod +x /entrypoint.sh
-
-CMD ["/entrypoint.sh"]
+USER node
+CMD ["node", "--import", "./server/node_modules/tsx/dist/loader.mjs", "server/dist/index.js"]
